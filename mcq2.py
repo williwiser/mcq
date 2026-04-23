@@ -38,18 +38,19 @@ def crop_region(img, x, y, w, h):
 #184.5 36
 #179, 33
 def map_grid(img):
-    f =np.zeros((30, 5), dtype=np.uint8)
+    f = np.zeros((30, 5), dtype=np.uint8)
     tl = (180, 33)
-    def group(tl, x_gap, y_gap):
+    
+    def group(tl, x_gap, y_gap, row_offset):
         for j in range(5):
             for i in range(5):
                 filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5)
-                f[j][i] = filled
-                cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1) 
-                # cv2.drawMarker(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), (0, 255, 0), markerType=cv2.MARKER_STAR, markerSize=10, thickness=1)
+                f[row_offset + j][i] = filled
+                cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
 
     for g in range(6):
-        group((tl[0], tl[1]+(g*82)), 12, 13)
+        group((tl[0], tl[1]+(g*82)), 12, 13, row_offset=g*5)
+    
     print(f)
 
 
