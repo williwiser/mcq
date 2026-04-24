@@ -219,11 +219,11 @@ def write_file(st_num, task_num, st_ans):
     if student_num_valid(st_num):
         with open(f"marked/mcq_{st_num}_task{task_num}.csv", 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerows(data) # Writes all rows at once
+            writer.writerows(data)
     else:
         with open(f"marked_invalid_student_nums/mcq_{st_num}_task{task_num}.csv", 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerows(data) # Writes all rows at once
+            writer.writerows(data) 
 
 
 def process_mcq(mcq_path, ans_path):
