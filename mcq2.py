@@ -5,78 +5,13 @@ from pdf2image import convert_from_path
 import csv
 
 MEMO: Final = np.array([
-    [1,0,0,0,0],
-    [0,0,1,0,0],
-    [0,1,0,0,0],
-    [0,0,0,1,0],
-    [0,0,0,0,1],
-
-    [0,1,0,0,0],
-    [1,0,0,0,0],
-    [0,0,0,0,1],
-    [0,0,1,0,0],
-    [0,0,0,1,0],
-
-    [0,0,0,1,0],
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-    [1,0,0,0,0],
-    [0,0,1,0,0],
-
-    [0,0,1,0,0],
-    [0,0,0,1,0],
-    [1,0,0,0,0],
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-
-    [0,0,0,0,1],
-    [0,0,1,0,0],
-    [0,1,0,0,0],
-    [0,0,0,1,0],
-    [1,0,0,0,0],
-
-    [1,0,0,0,0],
-    [0,0,0,1,0],
-    [0,0,1,0,0],
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-    [1,0,0,0,0],
-    [0,0,1,0,0],
-    [0,0,0,1,0],
-
-    [0,0,0,1,0],
-    [1,0,0,0,0],
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-    [0,0,1,0,0],
-
-    [0,0,1,0,0],
-    [0,0,0,0,1],
-    [0,0,0,1,0],
-    [1,0,0,0,0],
-    [0,1,0,0,0],
-
-    [0,1,0,0,0],
-    [0,0,1,0,0],
-    [0,0,0,1,0],
-    [0,0,0,0,1],
-    [1,0,0,0,0],
-
-    [0,0,0,0,1],
-    [0,1,0,0,0],
-    [1,0,0,0,0],
-    [0,0,1,0,0],
-    [0,0,0,1,0],
-
-    [1,0,0,0,0],
-    [0,0,1,0,0],
-    [0,1,0,0,0],
-    [0,0,0,0,1],
-    [0,0,0,0,1],
- ], dtype=int)
+    "A","B","C","D","E","A","C","B","D","E",
+    "B","D","A","E","C","C","A","E","B","D",
+    "D","C","B","A","E","E","B","D","C","A",
+    "A","E","C","B","D","B","A","D","E","C",
+    "C","D","E","A","B","E","C","A","D","B",
+    "B","A","D","C","E","D","B","E","A","C"
+])
 
 def read_pdf(path):
     images = []
@@ -199,7 +134,7 @@ def get_student_ans(img):
             answers.append("_")
         
 
-    return grid, answers
+    return answers
 
 def get_student_num(img):
     student_num = "g"
@@ -238,7 +173,7 @@ def grade(answers, memo):
     corr = 0
 
     for i in range(len(memo)):
-        if (answers[i] == memo[i]).all():
+        if answers[i] == memo[i]:
             corr += 1
 
     return corr, len(memo)
@@ -263,13 +198,13 @@ def main():
     # student_num = map_details_grid(region, (30, 5))
     student_num = get_student_num(region)
     print(get_student_num(region))
-    print(student_ans[1])
-    print(grade(student_ans[0], MEMO))
+    print(student_ans)
+    print(grade(student_ans, MEMO))
     cv2.imwrite("f_out.png", region)
 
     data = [["question", "answer"]]
 
-    for i, ans in enumerate(student_ans[1], start=1):
+    for i, ans in enumerate(student_ans, start=1):
         data.append([i, ans])
 
     with open(f"mcq_{student_num}_task{task_num}.csv", 'w', newline='') as file:
