@@ -3,6 +3,8 @@ import numpy as np
 from typing import Final
 from pdf2image import convert_from_path
 import csv
+import os
+import pandas as pd
 
 MEMO: Final = np.array([
     "A","B","C","D","E","A","C","B","D","E",
@@ -71,7 +73,7 @@ def map_details_grid(img, tl):
     def group(tl, x_gap, y_gap):
         for j in range(26):
             for i in range(7):
-                filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5)
+                filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5, fill_ratio=0.25)
                 f[j][i] = filled
                 #cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
 
@@ -136,6 +138,18 @@ def get_student_ans(img):
 
     return answers
 
+def student_num_valid(sn):
+    if len(sn) != 8:
+        return False
+    if not sn[0] == "g":
+        return False
+    for n in sn[1:3] + sn[4:]:
+        if not n.isdigit():
+            return False
+    if not sn[3].isalpha():
+        return False
+    return True
+
 def get_student_num(img):
     student_num = "g"
     student_num_grid = map_details_grid(img, (30, 5))
@@ -144,15 +158,18 @@ def get_student_num(img):
         for i in range(len(student_num_grid[0:10, j])):
             if (student_num_grid[0:10, j][i] == 1):
                 student_num += str(i)
+                break
     
     for i in range(len(student_num_grid[:, 2])):
         if (student_num_grid[:, 2][i] == 1):
             student_num += alphabet[i]
+            break
 
     for j in range(3, 7):
         for i in range(len(student_num_grid[0:10, j])):
             if (student_num_grid[0:10, j][i] == 1):
                 student_num += str(i)
+                break
     return student_num
 
 def is_circle_filled(img, cx, cy, radius, threshold=180, fill_ratio=0.5):
@@ -170,46 +187,118 @@ def is_circle_filled(img, cx, cy, radius, threshold=180, fill_ratio=0.5):
     return ratio > fill_ratio  # True if mostly filled/dark
 
 def grade(answers, memo):
-    corr = 0
-
-    for i in range(len(memo)):
-        if answers[i] == memo[i]:
-            corr += 1
-
-    return corr, len(memo)
-
-def main():
-    example = read_pdf("MCQ_600dpi_2016.pdf")[10]
-    example = cv2.resize(example, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
-
-    template_img = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
-    template_img = cv2.resize(template_img, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
-
-    x, y, w, h = 20, 65, 410, 540   # adjust to your region of interest
-    template_crop = crop_region(template_img, x, y, w, h)
+    mark = 0
    
+    memo_df = pd.read_csv(memo)
+    
+    total= float(memo_df["weighting"].sum())
 
-    al = align_to_template(template_img, example)
-    region = crop_region(al, x, y, w, h)
+    for i in range(1, len(memo_df)):
+        if answers[i] == memo_df["answer"][i]:
+            weighting = float(memo_df.loc[memo_df["question"] == i, "weighting"].values[0])
+            mark += weighting
 
-    task_num = get_task_num(region)
-    # map_grid(region, (298, 33))
-    student_ans = get_student_ans(region)
-    # student_num = map_details_grid(region, (30, 5))
-    student_num = get_student_num(region)
-    print(get_student_num(region))
-    print(student_ans)
-    print(grade(student_ans, MEMO))
-    cv2.imwrite("f_out.png", region)
+    
 
+    return mark, total
+
+def write_file(st_num, task_num, st_ans):
     data = [["question", "answer"]]
 
-    for i, ans in enumerate(student_ans, start=1):
+    for i, ans in enumerate(st_ans, start=1):
         data.append([i, ans])
 
-    with open(f"mcq_{student_num}_task{task_num}.csv", 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data) # Writes all rows at once
+    os.makedirs("marked", exist_ok=True)
+    os.makedirs("marked_invalid_student_nums", exist_ok=True)
+
+    if student_num_valid(st_num):
+        with open(f"marked/mcq_{st_num}_task{task_num}.csv", 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(data) # Writes all rows at once
+    else:
+        with open(f"marked_invalid_student_nums/mcq_{st_num}_task{task_num}.csv", 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(data) # Writes all rows at once
+
+
+def process_mcq(mcq_path, ans_path):
+    mcq_pdf = read_pdf(path=mcq_path)
+    template = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
+    template = cv2.resize(template, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+    x, y, w, h = 20, 65, 410, 540
+    cropped_pages = []
+    grades_df = pd.DataFrame()
+    grades_invalid_df = pd.DataFrame()
+
+    for page in mcq_pdf:
+        page = cv2.resize(page, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+        al_page = align_to_template(template, page)
+        cropped = crop_region(al_page, x, y, w, h)
+        cropped_pages.append(cropped)
+
+    for page in cropped_pages:
+        student_num = get_student_num(page)
+        task_num = get_task_num(page)
+        student_ans = get_student_ans(page)
+        student_mark = grade(student_ans, ans_path)
+
+        percentage = (student_mark[0]/student_mark[1])*100
+        if student_num_valid(student_num):
+            new_grade = pd.DataFrame([{"student_no": student_num, "grade": student_mark[0], "grade(%): ": f"{percentage:.2f}"}])
+            grades_df = pd.concat([grades_df, new_grade])
+        else:
+            new_grade = pd.DataFrame([{"student_no": student_num, "grade": student_mark[0], "grade(%): ": f"{percentage:.2f}"}])
+            grades_invalid_df = pd.concat([grades_invalid_df, new_grade])
+
+        write_file(st_num=student_num, task_num=task_num, st_ans=student_ans)
+
+        print("---------------------------")
+        print(f"Student number: {student_num}")
+        print(f"Task number: {task_num}")
+        print(f"Student mark: {student_mark}")
+        print("---------------------------")
+        print("")
+    grades_df.to_csv("grades.csv", index=False)
+    grades_invalid_df.to_csv("grades_invalid_student_nums.csv", index=False)
+
+def main():
+    # example = read_pdf("MCQ_600dpi_2016.pdf")[10]
+    # example = cv2.resize(example, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+
+    # template_img = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
+    # template_img = cv2.resize(template_img, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+
+    # x, y, w, h = 20, 65, 410, 540   # adjust to your region of interest
+   
+
+    # al = align_to_template(template_img, example)
+    # region = crop_region(al, x, y, w, h)
+
+    # task_num = get_task_num(region)
+    # student_ans = get_student_ans(region)
+    # student_num = get_student_num(region)
+
+    # print(get_student_num(region))
+    # print(student_ans)
+    # print(grade(student_ans, MEMO))
+    # cv2.imwrite("f_out.png", region)
+
+    # data = [["question", "answer"]]
+
+    # for i, ans in enumerate(student_ans, start=1):
+    #     data.append([i, ans])
+
+    # with open(f"mcq_{student_num}_task{task_num}.csv", 'w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerows(data) # Writes all rows at once
+
+    print("-------------------------------------")
+    print("             MCQ READER              ")
+    print("-------------------------------------\n")
+
+    mcq_path = input("Enter MCQ scripts path (pdf): ")
+    ans_path = input("Enter answer sheet path (csv): ")
+    process_mcq(mcq_path, ans_path)
 
 if __name__ == "__main__":
     main()
