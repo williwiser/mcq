@@ -1,3 +1,4 @@
+# Written by William Wani (G21W7943)
 import cv2
 import numpy as np
 from typing import Final
@@ -16,6 +17,7 @@ MEMO: Final = np.array([
 ])
 
 def read_pdf(path):
+    """Converts a pdf to list of images"""
     images = []
     pages = convert_from_path(path, dpi=200)
   
@@ -28,6 +30,7 @@ def read_pdf(path):
     return images
 
 def align_to_template(template, img):
+    """Warps an image according to template"""
     orb = cv2.ORB_create(5000)
     kp1, des1 = orb.detectAndCompute(template, None)
     kp2, des2 = orb.detectAndCompute(img, None)
@@ -45,12 +48,11 @@ def align_to_template(template, img):
     return aligned
 
 def crop_region(img, x, y, w, h):
+    """Crops a region of an image"""
     return img[y:y+h, x:x+w]
 
-#738 144
-#184.5 36
-#179, 33
 def map_student_grid(img, tl):
+    """Draws grid circles around answer bubbles"""
     f = np.zeros((30, 5), dtype=np.uint8)
     # tl = (180, 33)
     
@@ -67,6 +69,7 @@ def map_student_grid(img, tl):
     return np.array(f)
 
 def map_details_grid(img, tl):
+    """draws grid circles around student no bubbles"""
     f = np.zeros((26, 7), dtype=np.uint8)
     # tl = (180, 33)
     
@@ -82,6 +85,7 @@ def map_details_grid(img, tl):
     return np.array(f)
 
 def map_task_grid(img, tl):
+    """draws grid circles around task no circles"""
     f = np.zeros((10, 2), dtype=np.uint8)
     # tl = (180, 33)
     
@@ -97,6 +101,7 @@ def map_task_grid(img, tl):
     return np.array(f)
 
 def get_task_num(img):
+    """gets task number from image"""
     task_num_grid = map_task_grid(img, (98, 263))
     c1 = task_num_grid[:, 0]
     c2 = task_num_grid[:, 1]
@@ -119,6 +124,7 @@ def get_task_num(img):
                     
 
 def get_student_ans(img):
+    """gets student answers from image"""
     c1 = map_student_grid(img, (180, 33))
     c2 = map_student_grid(img, (298, 33))
     grid= np.concatenate((c1, c2), axis=0)
@@ -139,6 +145,7 @@ def get_student_ans(img):
     return answers
 
 def student_num_valid(sn):
+    """check if student no is valid"""
     if len(sn) != 8:
         return False
     if not sn[0] == "g":
@@ -151,6 +158,7 @@ def student_num_valid(sn):
     return True
 
 def get_student_num(img):
+    """get student no from image"""
     student_num = "g"
     student_num_grid = map_details_grid(img, (30, 5))
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -173,24 +181,22 @@ def get_student_num(img):
     return student_num
 
 def is_circle_filled(img, cx, cy, radius, threshold=180, fill_ratio=0.5):
-    # create a mask for the circle
-    mask = np.zeros(img.shape, dtype=np.uint8)
-    cv2.circle(mask, (cx, cy), radius, 255, -1)  # -1 fills the circle
+    """check if circle is filled"""
     
-    # get pixels within the circle
+    mask = np.zeros(img.shape, dtype=np.uint8)
+    cv2.circle(mask, (cx, cy), radius, 255, -1)
+    
     pixels = img[mask == 255]
     
-    # ratio of dark pixels
     dark_pixels = np.sum(pixels < threshold)
     ratio = dark_pixels / len(pixels)
     
-    return ratio > fill_ratio  # True if mostly filled/dark
+    return ratio > fill_ratio 
 
 def grade(answers, memo):
+    """grade student answers against memo and return mark and total"""
     mark = 0
-   
     memo_df = pd.read_csv(memo)
-    
     total= float(memo_df["weighting"].sum())
 
     for i in range(1, len(memo_df)):
@@ -198,11 +204,10 @@ def grade(answers, memo):
             weighting = float(memo_df.loc[memo_df["question"] == i, "weighting"].values[0])
             mark += weighting
 
-    
-
     return mark, total
 
 def write_file(st_num, task_num, st_ans):
+    """create file of student answers"""
     data = [["question", "answer"]]
 
     for i, ans in enumerate(st_ans, start=1):
@@ -222,6 +227,7 @@ def write_file(st_num, task_num, st_ans):
 
 
 def process_mcq(mcq_path, ans_path):
+    """processes mcq and outputs csv files and grades"""
     mcq_pdf = read_pdf(path=mcq_path)
     template = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
     template = cv2.resize(template, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
@@ -262,36 +268,6 @@ def process_mcq(mcq_path, ans_path):
     grades_invalid_df.to_csv("grades_invalid_student_nums.csv", index=False)
 
 def main():
-    # example = read_pdf("MCQ_600dpi_2016.pdf")[10]
-    # example = cv2.resize(example, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
-
-    # template_img = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
-    # template_img = cv2.resize(template_img, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
-
-    # x, y, w, h = 20, 65, 410, 540   # adjust to your region of interest
-   
-
-    # al = align_to_template(template_img, example)
-    # region = crop_region(al, x, y, w, h)
-
-    # task_num = get_task_num(region)
-    # student_ans = get_student_ans(region)
-    # student_num = get_student_num(region)
-
-    # print(get_student_num(region))
-    # print(student_ans)
-    # print(grade(student_ans, MEMO))
-    # cv2.imwrite("f_out.png", region)
-
-    # data = [["question", "answer"]]
-
-    # for i, ans in enumerate(student_ans, start=1):
-    #     data.append([i, ans])
-
-    # with open(f"mcq_{student_num}_task{task_num}.csv", 'w', newline='') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerows(data) # Writes all rows at once
-
     print("-------------------------------------")
     print("             MCQ READER              ")
     print("-------------------------------------\n")
