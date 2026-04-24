@@ -122,7 +122,7 @@ def map_student_grid(img, tl):
             for i in range(5):
                 filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5)
                 f[row_offset + j][i] = filled
-                cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
+                #cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
 
     for g in range(6):
         group((tl[0], tl[1]+(g*82)), 12, 13, row_offset=g*5)
@@ -138,11 +138,47 @@ def map_details_grid(img, tl):
             for i in range(7):
                 filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5)
                 f[j][i] = filled
-                cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 255, 0), 1)
+                #cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
 
     group((tl[0], tl[1]+(82)), 14, 14)
     
     return np.array(f)
+
+def map_task_grid(img, tl):
+    f = np.zeros((10, 2), dtype=np.uint8)
+    # tl = (180, 33)
+    
+    def group(tl, x_gap, y_gap):
+        for j in range(10):
+            for i in range(2):
+                filled = is_circle_filled(img, cx=tl[0]+(x_gap*i), cy=tl[1]+(y_gap*j), radius=5)
+                f[j][i] = filled
+                cv2.circle(img, (tl[0]+(x_gap*i), tl[1]+(y_gap*j)), 5, (0, 0, 255), 1)
+
+    group((tl[0], tl[1]), 14, 14)
+    
+    return np.array(f)
+
+def get_task_num(img):
+    task_num_grid = map_task_grid(img, (98, 263))
+    c1 = task_num_grid[:, 0]
+    c2 = task_num_grid[:, 1]
+
+    task_num = ""
+    for i in range(len(c1)):
+        if c1[i] == 1:
+            task_num += str(i)
+            break
+
+    for i in range(len(c2)):
+        if c2[i] == 1:
+            task_num += str(i)
+            break
+
+    if task_num == "":
+        return "Invalid"
+
+    return int(task_num)
                     
 
 def get_student_ans(img):
@@ -208,7 +244,7 @@ def grade(answers, memo):
     return corr, len(memo)
 
 def main():
-    example = read_pdf("MCQ_600dpi_2016.pdf")[3]
+    example = read_pdf("MCQ_600dpi_2016.pdf")[10]
     example = cv2.resize(example, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
 
     template_img = cv2.imread("template.png", cv2.IMREAD_GRAYSCALE)
@@ -221,7 +257,7 @@ def main():
     al = align_to_template(template_img, example)
     region = crop_region(al, x, y, w, h)
 
-    # map_grid(region, (180, 33))
+    task_num = get_task_num(region)
     # map_grid(region, (298, 33))
     student_ans = get_student_ans(region)
     # student_num = map_details_grid(region, (30, 5))
@@ -236,7 +272,7 @@ def main():
     for i, ans in enumerate(student_ans[1], start=1):
         data.append([i, ans])
 
-    with open(f"mcq_{student_num}.csv", 'w', newline='') as file:
+    with open(f"mcq_{student_num}_task{task_num}.csv", 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerows(data) # Writes all rows at once
 
